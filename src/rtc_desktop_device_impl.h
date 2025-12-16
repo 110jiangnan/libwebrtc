@@ -11,6 +11,8 @@
 #include "rtc_base/thread.h"
 #include "rtc_desktop_device.h"
 #include "rtc_desktop_media_list_impl.h"
+#include <map>
+#include <string>
 
 namespace libwebrtc {
 
@@ -20,7 +22,8 @@ class RTCDesktopDeviceImpl : public RTCDesktopDevice {
   ~RTCDesktopDeviceImpl();
 
   scoped_refptr<RTCDesktopCapturer> CreateDesktopCapturer(
-      scoped_refptr<MediaSource> source) override;
+      scoped_refptr<MediaSource> source,
+      std::map<std::string, std::string> config) override;
 
   scoped_refptr<RTCDesktopMediaList> GetDesktopMediaList(
       DesktopType type) override;

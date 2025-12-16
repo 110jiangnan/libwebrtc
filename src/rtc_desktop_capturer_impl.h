@@ -28,6 +28,8 @@
 #include "rtc_base/thread.h"
 #include "src/internal/vcm_capturer.h"
 #include "src/internal/video_capturer.h"
+#include <map>
+#include <string>
 
 namespace libwebrtc {
 
@@ -38,7 +40,8 @@ class RTCDesktopCapturerImpl : public RTCDesktopCapturer,
   RTCDesktopCapturerImpl(DesktopType type,
                          webrtc::DesktopCapturer::SourceId source_id,
                          webrtc::Thread* signaling_thread,
-                         scoped_refptr<MediaSource> source);
+                         scoped_refptr<MediaSource> source,
+                         std::map<std::string, std::string> config);
   ~RTCDesktopCapturerImpl();
 
   void RegisterDesktopCapturerObserver(
