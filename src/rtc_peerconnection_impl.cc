@@ -15,6 +15,7 @@
 #include "rtc_rtp_receiver_impl.h"
 #include "rtc_rtp_sender_impl.h"
 #include "rtc_rtp_transceiver_impl.h"
+#include <api/field_trials.h>
 
 using webrtc::Thread;
 
@@ -448,6 +449,10 @@ bool RTCPeerConnectionImpl::Initialize() {
   rtc_peerconnection_factory_->SetOptions(options);
 
   webrtc::PeerConnectionDependencies dependencies(this);
+
+  dependencies.trials = webrtc::FieldTrials::CreateNoGlobal(
+      "WebRTC-PcFactoryDefaultBitrates/min:30,start:2000,max:5000/");
+
   auto result = rtc_peerconnection_factory_->CreatePeerConnectionOrError(
       config, std::move(dependencies));
 
