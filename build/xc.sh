@@ -12,17 +12,18 @@ if [ "$MODE" == "debug" ]; then
 fi
 
 
-if [ ! -e "$(pwd)/depot_tools" ]
-then
-  git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
-fi
+# if [ ! -e "$(pwd)/depot_tools" ]
+# then
+#   git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
+# fi
 
 export PATH="$(pwd)/depot_tools:$PATH"
+ninja --version
 
-if [ ! -e "$(pwd)/src" ]
-then
-  gclient sync -D --no-history
-fi
+# if [ ! -e "$(pwd)/src" ]
+# then
+#   gclient sync -D --no-history
+# fi
 
 echo "xcframework_dynamic_build.sh: MODE=$MODE, DEBUG=$DEBUG"
 
@@ -47,6 +48,7 @@ gn gen $OUT_DIR/tvOS-arm64-device --root="src" --args="
       enable_dsyms = $DEBUG
       enable_stripping = true" --ide=xcode
 
+ninja --version
 ninja -C $OUT_DIR/tvOS-arm64-device ios_framework_bundle -j 10
 
 gn gen $OUT_DIR/tvOS-arm64-simulator --root="src" --args="    
@@ -70,6 +72,7 @@ gn gen $OUT_DIR/tvOS-arm64-simulator --root="src" --args="
       enable_dsyms = $DEBUG
       enable_stripping = true" --ide=xcode
 
+ninja --version
 ninja -C $OUT_DIR/tvOS-arm64-simulator ios_framework_bundle -j 10
 
 gn gen $OUT_DIR/xrOS-arm64-device --root="src" --args="
