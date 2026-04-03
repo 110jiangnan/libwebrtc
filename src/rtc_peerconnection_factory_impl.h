@@ -2,7 +2,7 @@
 #define LIB_WEBRTC_MEDIA_SESSION_FACTORY_IMPL_HXX
 
 #include <memory>
-#include "api/audio/empty_audio_device_module.h"
+#include "api/audio/empty_audio_device.h"
 #include "api/media_stream_interface.h"
 #include "api/peer_connection_interface.h"
 #include "api/task_queue/task_queue_factory.h"
