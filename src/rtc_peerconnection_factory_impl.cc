@@ -116,9 +116,9 @@ bool RTCPeerConnectionFactoryImpl::Initialize() {
         audio_transport_factory_);
   }
   if (!rtc_peerconnection_factory_ && is_myaudio) {
-    empty_pc_factory_ = CreatePeerConnectionFactory(
+    rtc_peerconnection_factory_ = CreatePeerConnectionFactory(
         network_thread_.get(), worker_thread_.get(), signaling_thread_.get(),
-        empty_audio_device_module_, webrtc::CreateBuiltinAudioEncoderFactory(),
+        audio_device_module_, webrtc::CreateBuiltinAudioEncoderFactory(),
         webrtc::CreateBuiltinAudioDecoderFactory(),
 #if defined(USE_INTEL_MEDIA_SDK)
         CreateIntelVideoEncoderFactory(), CreateIntelVideoDecoderFactory(),
@@ -144,8 +144,7 @@ bool RTCPeerConnectionFactoryImpl::Terminate() {
     audio_processing_impl_ = nullptr;
   });
   rtc_peerconnection_factory_ = NULL;
-  empty_pc_factory_ = NULL;
-  if (audio_device_module_ || empty_audio_device_module_) {
+  if (audio_device_module_) {
     worker_thread_->BlockingCall([this] { DestroyAudioDeviceModule_w(); });
   }
 
