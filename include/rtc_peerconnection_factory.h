@@ -23,8 +23,8 @@ class RTCRtpCapabilities;
 class RTCPeerConnectionFactory : public RefCountInterface {
  public:
 
-  virtual RTCPeerConnectionFactory copySharedField() = 0;
-  
+  virtual scoped_refptr<RTCPeerConnectionFactory> copySharedField() = 0;
+
   virtual bool Initialize() = 0;
 
   virtual bool Terminate() = 0;
@@ -72,6 +72,8 @@ class RTCPeerConnectionFactory : public RefCountInterface {
 
   virtual scoped_refptr<RTCRtpCapabilities> GetRtpReceiverCapabilities(
       RTCMediaType media_type) = 0;
+public:
+    bool is_myaudio = false;
 };
 
 }  // namespace libwebrtc
