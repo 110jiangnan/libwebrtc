@@ -20,5 +20,5 @@ echo "android.sh: MODE=$MODE, DEBUG=$DEBUG"
 python3 ./tools_webrtc/android/build_aar.py \
     --build-dir $OUT_DIR1 \
     --output $OUT_DIR1/libwebrtc.aar \
-    --extra-gn-args 'treat_warnings_as_errors=false' \
+    --extra-gn-args 'treat_warnings_as_errors=false ffmpeg_branding=\"Chrome\" rtc_use_h264=true proprietary_codecs=true' \
     --arch arm64-v8a armeabi-v7a x86_64
