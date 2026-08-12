@@ -33,8 +33,6 @@ class RTCPeerConnectionFactoryImpl : public RTCPeerConnectionFactory {
 
   virtual ~RTCPeerConnectionFactoryImpl();
 
-  scoped_refptr<RTCPeerConnectionFactory> copySharedField() override;
-
   bool Initialize() override;
 
   bool Terminate() override;

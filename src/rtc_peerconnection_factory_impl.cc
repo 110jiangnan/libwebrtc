@@ -50,33 +50,18 @@ env_(webrtc::EnvironmentFactory().Create()) {}
 
 RTCPeerConnectionFactoryImpl::~RTCPeerConnectionFactoryImpl() {}
 
-scoped_refptr<RTCPeerConnectionFactory> RTCPeerConnectionFactoryImpl::copySharedField() {
-  scoped_refptr<RTCPeerConnectionFactoryImpl> factory = new RefCountedObject<RTCPeerConnectionFactoryImpl>();
-  factory->worker_thread_ = worker_thread_;
-  factory->signaling_thread_ = signaling_thread_;
-  factory->network_thread_ = network_thread_;
-  return scoped_refptr<RTCPeerConnectionFactory>(factory);
-}
-
 bool RTCPeerConnectionFactoryImpl::Initialize() {
-  if (!worker_thread_) {
-    worker_thread_ =
-        std::shared_ptr<webrtc::Thread>(webrtc::Thread::Create().release());
-    worker_thread_->SetName("worker_thread", nullptr);
-    RTC_CHECK(worker_thread_->Start()) << "Failed to start thread";
-  }
-  if (!signaling_thread_) {
-    signaling_thread_ =
-        std::shared_ptr<webrtc::Thread>(webrtc::Thread::Create().release());
-    signaling_thread_->SetName("signaling_thread", nullptr);
-    RTC_CHECK(signaling_thread_->Start()) << "Failed to start thread";
-  }
-  if (!network_thread_) {
-    network_thread_ = std::shared_ptr<webrtc::Thread>(
-        webrtc::Thread::CreateWithSocketServer().release());
-    network_thread_->SetName("network_thread", nullptr);
-    RTC_CHECK(network_thread_->Start()) << "Failed to start thread";
-  }
+  worker_thread_ = webrtc::Thread::Create();
+  worker_thread_->SetName("worker_thread", nullptr);
+  RTC_CHECK(worker_thread_->Start()) << "Failed to start thread";
+
+  signaling_thread_ = webrtc::Thread::Create();
+  signaling_thread_->SetName("signaling_thread", nullptr);
+  RTC_CHECK(signaling_thread_->Start()) << "Failed to start thread";
+
+  network_thread_ = webrtc::Thread::CreateWithSocketServer();
+  network_thread_->SetName("network_thread", nullptr);
+  RTC_CHECK(network_thread_->Start()) << "Failed to start thread";
 
   if (!audio_device_module_) {
     task_queue_factory_ = webrtc::CreateDefaultTaskQueueFactory();
