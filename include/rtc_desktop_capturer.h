@@ -15,6 +15,29 @@ namespace libwebrtc {
 class DesktopCapturerObserver;
 
 /**
+ * @brief External frame consumer (MyDesk lock-screen wiring).
+ *
+ * Called by the Rust producer inside its frame lock on the desktop capture
+ * thread, so the given ARGB pointer stays valid for the whole call. Must
+ * consume the frame synchronously (here: I420 conversion + OnFrame).
+ * `len` is the exact byte count handed over by the producer — the consumer
+ * must NOT recompute it from w/h (the producer's buffer may not be tightly
+ * packed), only use it to validate.
+ */
+typedef void (*ExternalFrameConsumer)(void* ud, const uint8_t* argb, int w,
+                                      int h, int len);
+
+/**
+ * @brief External frame source callback (MyDesk lock-screen wiring).
+ *
+ * Called from the desktop capture thread on every capture tick when set.
+ * If a lock-screen frame is available, invokes consume(ud, argb, w, h) inside
+ * its frame lock and returns 1; returns 0 to fall through to normal capture.
+ */
+typedef int (*ExternalFrameCallback)(void* user_data,
+                                     ExternalFrameConsumer consume, void* ud);
+
+/**
  * @brief The interface for capturing desktop media.
  *
  * This interface defines methods for registering and deregistering observer
@@ -77,6 +100,23 @@ class RTCDesktopCapturer : public RefCountInterface {
    * @return True if capture is running, false otherwise.
    */
   virtual bool IsRunning() = 0;
+
+  /**
+   * @brief Sets an external frame source that replaces the normal desktop
+   *        capture while set (e.g. lock-screen GDI frames).
+   *
+   * @param cb Callback invoked on every capture tick; may be nullptr to
+   *           disable. If it returns a frame, that frame is fed into the
+   *           video pipeline instead of the normal capture.
+   * @param user_data Opaque pointer passed back to the callback.
+   */
+  virtual void SetExternalFrameCallback(ExternalFrameCallback cb,
+                                        void* user_data) = 0;
+
+  /**
+   * @brief Clears the external frame source, restoring normal capture.
+   */
+  virtual void ClearExternalFrameCallback() = 0;
 
   /**
    * @brief Retrieves the media source for the current desktop capture.

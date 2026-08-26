@@ -216,10 +216,57 @@ void RTCDesktopCapturerImpl::OnCaptureResult(
 #endif
 }
 
+void RTCDesktopCapturerImpl::ProcessExternalFrame(int width, int height,
+                                                  const uint8_t* data,
+                                                  size_t len) {
+  RTC_DCHECK(data);
+  RTC_DCHECK(width > 0 && height > 0);
+  RTC_DCHECK(len >= static_cast<size_t>(width) * height * 4);
+  if (!i420_buffer_ || i420_buffer_->width() * i420_buffer_->height() !=
+                          width * height) {
+    i420_buffer_ = webrtc::I420Buffer::Create(width, height);
+  }
+  // 与 OnCaptureResult 用同一 FOURCC(ARGB, 内存序 [A,R,G,B]), 保证锁屏/正常帧颜色解释一致。
+  libyuv::ConvertToI420(
+      data, 0, i420_buffer_->MutableDataY(), i420_buffer_->StrideY(),
+      i420_buffer_->MutableDataU(), i420_buffer_->StrideU(),
+      i420_buffer_->MutableDataV(), i420_buffer_->StrideV(), 0, 0, width,
+      height, width, height, libyuv::kRotate0, libyuv::FOURCC_ARGB);
+  OnFrame(webrtc::VideoFrame(i420_buffer_, 0, webrtc::TimeMillis(),
+                             webrtc::kVideoRotation_0));
+}
+
+// 锁内消费: Rust 还持着帧锁, argb 指针锁内稳定, 直接走与 OnCaptureResult 相同的
+// I420 转换 + OnFrame 路径(见 ProcessExternalFrame)。在本采集线程上执行。
+// len 用 Rust 报的实际字节数, 不自行按 w*h*4 反推(不假设生产者缓冲紧凑排布)。
+void RTCDesktopCapturerImpl::ConsumeExternalFrame(void* ud,
+                                                  const uint8_t* data, int w,
+                                                  int h, int len) {
+  auto* self = static_cast<RTCDesktopCapturerImpl*>(ud);
+  self->ProcessExternalFrame(w, h, data, static_cast<size_t>(len));
+}
+
 void RTCDesktopCapturerImpl::CaptureFrame() {
   RTC_DCHECK_RUN_ON(thread_.get());
   if (capture_state_ == CS_RUNNING) {
-    capturer_->CaptureFrame();
+    // 加锁取回调(插件线程可能同时在改), 然后在锁外调用回调。
+    ExternalFrameCallback cb = nullptr;
+    void* user_data = nullptr;
+    {
+      std::lock_guard<std::mutex> lock(external_mutex_);
+      cb = external_cb_;
+      user_data = external_user_data_;
+    }
+    if (cb) {
+      // 锁屏时由外部源(安全桌面 GDI 帧)出帧, 替代冻结的 DXGI 采集。
+      // Rust 在帧锁内同步调用 ConsumeExternalFrame(转 I420 + OnFrame),
+      // 数据指针锁内稳定; 返回 0(无帧)时走正常采集。
+      if (!cb(user_data, &RTCDesktopCapturerImpl::ConsumeExternalFrame, this)) {
+        capturer_->CaptureFrame();
+      }
+    } else {
+      capturer_->CaptureFrame();
+    }
     thread_->PostDelayedHighPrecisionTask(
         [this]() { CaptureFrame(); },
         webrtc::TimeDelta::Millis(capture_delay_));
