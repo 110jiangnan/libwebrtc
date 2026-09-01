@@ -1,90 +1,29 @@
 #!/bin/sh
-
-MODE=""
-COMMIT=""
-
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --profile)
-      MODE="$2"
-      shift 2
-      ;;
-    --commit)
-      COMMIT="$2"
-      shift 2
-      ;;
-    debug|release)
-      # Backwards-compatible positional form: $0 release [commit]
-      MODE="$1"
-      shift
-      if [ -n "$1" ] && [ "${1#--}" = "$1" ]; then
-        COMMIT="$1"
-        shift
-      fi
-      ;;
-    *)
-      echo "Error: Unknown argument '$1'"
-      echo "Usage: $0 --profile <debug|release> [--commit <hash>]"
-      exit 1
-      ;;
-  esac
-done
-
-if [ -z "$MODE" ]; then
-  echo "Usage: $0 --profile <debug|release> [--commit <hash>]"
-  exit 1
+if [ ! -n "$1" ]; then
+  echo "Usage: $0 'debug' | 'release'"
+  exit 0
 fi
 
+MODE=$1
 OUT_DIR=./out-$MODE
 DEBUG="false"
-if [ "$MODE" = "debug" ]; then
+if [ "$MODE" == "debug" ]; then
   DEBUG="true"
 fi
 
+export PATH="$(pwd)/../depot_tools:$PATH"
+ninja --version
 
-if [ ! -e "$(pwd)/depot_tools" ]
-then
-  git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
-fi
+echo "xcframework_dynamic_build.sh: MODE=$MODE, DEBUG=$DEBUG"
 
-export PATH="$(pwd)/depot_tools:$PATH"
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-run_gclient_sync() {
-  default_branch=$(sed -nE "s/.*\"url\":[[:space:]]*'[^@]+@([^']+)'.*/\1/p" "$SCRIPT_DIR/.gclient")
-  if [ -z "$default_branch" ]; then
-    echo "Error: cannot extract default branch from $SCRIPT_DIR/.gclient"
-    exit 1
-  fi
-  checkout_ref="${COMMIT:-$default_branch}"
-  echo "Checkout ref: $checkout_ref"
-
-  if [ ! -e "$(pwd)/src" ]; then
-    git clone https://github.com/webrtc-sdk/webrtc.git src
-  fi
-
-  (
-    cd src
-    git fetch
-    git checkout -f "$checkout_ref"
-    git clean -df
-  )
-
-  gclient sync --with_branch_heads --jobs=8
-}
-
-run_gclient_sync
-
-echo "xcframework_dynamic_build.sh: MODE=$MODE, DEBUG=$DEBUG, COMMIT=$COMMIT"
-
-gn gen $OUT_DIR/tvOS-arm64-device --root="src" --args="    
+gn gen $OUT_DIR/tvOS-arm64-device --args="    
       target_os = \"ios\"
       ios_enable_code_signing = false
       is_component_build = false
       target_environment = \"appletv\"
       target_cpu = \"arm64\"
       ios_deployment_target = \"17.0\"
+      use_goma = false
       rtc_enable_symbol_export = true
       rtc_libvpx_build_vp9 = true
       rtc_include_tests = false
@@ -98,15 +37,17 @@ gn gen $OUT_DIR/tvOS-arm64-device --root="src" --args="
       enable_dsyms = $DEBUG
       enable_stripping = true" --ide=xcode
 
+ninja --version
 ninja -C $OUT_DIR/tvOS-arm64-device ios_framework_bundle -j 10
 
-gn gen $OUT_DIR/tvOS-arm64-simulator --root="src" --args="    
+gn gen $OUT_DIR/tvOS-arm64-simulator --args="    
       target_os = \"ios\"
       ios_enable_code_signing = false
       is_component_build = false
       target_environment = \"appletvsimulator\"
       target_cpu = \"arm64\"
       ios_deployment_target = \"17.0\"
+      use_goma = false
       rtc_enable_symbol_export = true
       rtc_libvpx_build_vp9 = true
       rtc_include_tests = false
@@ -120,16 +61,18 @@ gn gen $OUT_DIR/tvOS-arm64-simulator --root="src" --args="
       enable_dsyms = $DEBUG
       enable_stripping = true" --ide=xcode
 
+ninja --version
 ninja -C $OUT_DIR/tvOS-arm64-simulator ios_framework_bundle -j 10
 
-gn gen $OUT_DIR/xrOS-arm64-device --root="src" --args="
+gn gen $OUT_DIR/xrOS-arm64-device --args="
       treat_warnings_as_errors = false 
       target_os = \"ios\"
       ios_enable_code_signing = false
       is_component_build = false
       target_environment = \"xrdevice\"
       target_cpu = \"arm64\"
-      ios_deployment_target = \"26.0\"
+      ios_deployment_target = \"2.2.0\"
+      use_goma = false
       rtc_enable_symbol_export = true
       rtc_libvpx_build_vp9 = true
       rtc_include_tests = false
@@ -145,14 +88,15 @@ gn gen $OUT_DIR/xrOS-arm64-device --root="src" --args="
 
 ninja -C $OUT_DIR/xrOS-arm64-device ios_framework_bundle -j 10
 
-gn gen $OUT_DIR/xrOS-arm64-simulator --root="src" --args="
+gn gen $OUT_DIR/xrOS-arm64-simulator --args="
       treat_warnings_as_errors = false
       target_os = \"ios\"
       ios_enable_code_signing = false
       is_component_build = false
       target_environment = \"xrsimulator\"
       target_cpu = \"arm64\"
-      ios_deployment_target = \"26.0\"
+      ios_deployment_target = \"1.1.0\"
+      use_goma = false
       rtc_enable_symbol_export = true
       rtc_libvpx_build_vp9 = true
       rtc_include_tests = false
@@ -168,7 +112,7 @@ gn gen $OUT_DIR/xrOS-arm64-simulator --root="src" --args="
 
 ninja -C $OUT_DIR/xrOS-arm64-simulator ios_framework_bundle -j 10
 
-gn gen $OUT_DIR/catalyst-arm64 --root="src" --args="
+gn gen $OUT_DIR/catalyst-arm64 --args="
       treat_warnings_as_errors = false
       target_os = \"ios\"
       ios_enable_code_signing = false
@@ -176,6 +120,7 @@ gn gen $OUT_DIR/catalyst-arm64 --root="src" --args="
       target_environment = \"catalyst\"
       target_cpu = \"arm64\"
       ios_deployment_target = \"14.0\"
+      use_goma = false
       rtc_enable_symbol_export = true
       rtc_libvpx_build_vp9 = true
       rtc_include_tests = false
@@ -191,7 +136,7 @@ gn gen $OUT_DIR/catalyst-arm64 --root="src" --args="
 
 ninja -C $OUT_DIR/catalyst-arm64 ios_framework_bundle -j 10
 
-gn gen $OUT_DIR/catalyst-x64 --root="src" --args="
+gn gen $OUT_DIR/catalyst-x64 --args="
       treat_warnings_as_errors = false
       target_os = \"ios\"
       ios_enable_code_signing = false
@@ -199,6 +144,7 @@ gn gen $OUT_DIR/catalyst-x64 --root="src" --args="
       target_environment = \"catalyst\"
       target_cpu = \"x64\"
       ios_deployment_target = \"14.0\"
+      use_goma = false
       rtc_enable_symbol_export = true
       rtc_libvpx_build_vp9 = true
       rtc_include_tests = false
@@ -214,7 +160,7 @@ gn gen $OUT_DIR/catalyst-x64 --root="src" --args="
 
 ninja -C $OUT_DIR/catalyst-x64 ios_framework_bundle -j 10
 
-gn gen $OUT_DIR/iOS-arm64-device --root="src" --args="
+gn gen $OUT_DIR/iOS-arm64-device --args="
       treat_warnings_as_errors = false
       target_os = \"ios\"
       ios_enable_code_signing = false
@@ -222,6 +168,7 @@ gn gen $OUT_DIR/iOS-arm64-device --root="src" --args="
       target_environment = \"device\"
       target_cpu = \"arm64\"
       ios_deployment_target = \"13.0\"
+      use_goma = false
       rtc_enable_symbol_export = true
       rtc_libvpx_build_vp9 = true
       rtc_include_tests = false
@@ -237,7 +184,7 @@ gn gen $OUT_DIR/iOS-arm64-device --root="src" --args="
 
 ninja -C $OUT_DIR/iOS-arm64-device ios_framework_bundle -j 10
 
-gn gen $OUT_DIR/iOS-x64-simulator --root="src" --args="
+gn gen $OUT_DIR/iOS-x64-simulator --args="
       treat_warnings_as_errors = false
       target_os = \"ios\"
       ios_enable_code_signing = false
@@ -246,6 +193,7 @@ gn gen $OUT_DIR/iOS-x64-simulator --root="src" --args="
       target_cpu = \"x64\"
       ios_deployment_target = \"13.0\"
       rtc_libvpx_build_vp9 = true
+      use_goma = false
       rtc_enable_symbol_export = true
       rtc_include_tests = false
       rtc_build_examples = false
@@ -260,7 +208,7 @@ gn gen $OUT_DIR/iOS-x64-simulator --root="src" --args="
 
 ninja -C $OUT_DIR/iOS-x64-simulator ios_framework_bundle -j 10
 
-gn gen $OUT_DIR/iOS-arm64-simulator --root="src" --args="
+gn gen $OUT_DIR/iOS-arm64-simulator --args="
       treat_warnings_as_errors = false
       target_os = \"ios\"
       ios_enable_code_signing = false
@@ -268,6 +216,7 @@ gn gen $OUT_DIR/iOS-arm64-simulator --root="src" --args="
       target_environment = \"simulator\"
       target_cpu = \"arm64\"
       ios_deployment_target = \"13.0\"
+      use_goma = false
       rtc_enable_symbol_export = true
       rtc_libvpx_build_vp9 = true
       rtc_include_tests = false
@@ -283,13 +232,14 @@ gn gen $OUT_DIR/iOS-arm64-simulator --root="src" --args="
 
 ninja -C $OUT_DIR/iOS-arm64-simulator ios_framework_bundle -j 10
 
-gn gen $OUT_DIR/macOS-x64 --root="src" --args="
+gn gen $OUT_DIR/macOS-x64 --args="
       treat_warnings_as_errors = false
       target_os=\"mac\"
       target_cpu=\"x64\"
       mac_deployment_target=\"10.14\"
       is_component_build = false
       target_cpu = \"x64\"
+      use_goma = false
       rtc_enable_symbol_export = true
       rtc_libvpx_build_vp9 = true
       rtc_include_tests = false
@@ -304,13 +254,14 @@ gn gen $OUT_DIR/macOS-x64 --root="src" --args="
 
 ninja -C $OUT_DIR/macOS-x64 mac_framework_bundle -j 10
 
-gn gen $OUT_DIR/macOS-arm64 --root="src" --args="
+gn gen $OUT_DIR/macOS-arm64 --args="
       treat_warnings_as_errors = false
       target_os=\"mac\"
       target_cpu=\"x64\"
       mac_deployment_target=\"10.14\"
       is_component_build = false
       target_cpu = \"arm64\"
+      use_goma = false
       rtc_enable_symbol_export = true
       rtc_libvpx_build_vp9 = true
       rtc_include_tests = false
@@ -354,7 +305,7 @@ xcodebuild -create-xcframework \
   -framework $OUT_DIR/tvOS-arm64-simulator/WebRTC.framework \
   -output $OUT_DIR/WebRTC.xcframework
 
-cp ./src/LICENSE $OUT_DIR/WebRTC.xcframework/
+cp ./LICENSE $OUT_DIR/WebRTC.xcframework/
 
 cd $OUT_DIR/WebRTC.xcframework/macos-arm64_x86_64/WebRTC.framework/
 mv WebRTC Versions/A/WebRTC
@@ -366,3 +317,7 @@ mv WebRTC Versions/A/WebRTC
 ln -s Versions/Current/WebRTC WebRTC
 cd ../../../
 zip --symlinks -9 -r WebRTC.xcframework.zip WebRTC.xcframework
+
+# hash
+shasum -a 256 WebRTC.xcframework.zip > WebRTC.xcframework.zip.shasum
+cat WebRTC.xcframework.zip.shasum
