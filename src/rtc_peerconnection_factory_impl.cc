@@ -50,18 +50,34 @@ env_(webrtc::EnvironmentFactory().Create()) {}
 
 RTCPeerConnectionFactoryImpl::~RTCPeerConnectionFactoryImpl() {}
 
+RTCPeerConnectionFactoryImpl RTCPeerConnectionFactoryImpl::copySharedField() {
+  auto factory = new RTCPeerConnectionFactoryImpl();
+  factory->worker_thread_ = worker_thread_;
+  factory->signaling_thread_ = signaling_thread_;
+  factory->network_thread_ = network_thread_;
+  return factory;
+}
+
 bool RTCPeerConnectionFactoryImpl::Initialize() {
-  worker_thread_ = webrtc::Thread::Create();
-  worker_thread_->SetName("worker_thread", nullptr);
-  RTC_CHECK(worker_thread_->Start()) << "Failed to start thread";
+  if (!worker_thread_) {
+    worker_thread_ =
+        std::make_shared<webrtc::Thread>(std::move(webrtc::Thread::Create()));
+    worker_thread_->SetName("worker_thread", nullptr);
+    RTC_CHECK(worker_thread_->Start()) << "Failed to start thread";
+  }
+  if (!signaling_thread_) {
+    signaling_thread_ =
+        std::make_shared<webrtc::Thread>(std::move(webrtc::Thread::Create()));
+    signaling_thread_->SetName("signaling_thread", nullptr);
+    RTC_CHECK(signaling_thread_->Start()) << "Failed to start thread";
+  }
+  if (!network_thread_) {
+    network_thread_ = std::make_shared<webrtc::Thread>(
+        std::move(webrtc::Thread::CreateWithSocketServer()));
+    network_thread_->SetName("network_thread", nullptr);
+    RTC_CHECK(network_thread_->Start()) << "Failed to start thread";
+  }
 
-  signaling_thread_ = webrtc::Thread::Create();
-  signaling_thread_->SetName("signaling_thread", nullptr);
-  RTC_CHECK(signaling_thread_->Start()) << "Failed to start thread";
-
-  network_thread_ = webrtc::Thread::CreateWithSocketServer();
-  network_thread_->SetName("network_thread", nullptr);
-  RTC_CHECK(network_thread_->Start()) << "Failed to start thread";
   if (!audio_device_module_) {
     task_queue_factory_ = webrtc::CreateDefaultTaskQueueFactory();
     worker_thread_->BlockingCall([&] { CreateAudioDeviceModule_w(); });
@@ -80,7 +96,7 @@ bool RTCPeerConnectionFactoryImpl::Initialize() {
     });
   }
 
-  if (!rtc_peerconnection_factory_) {
+  if (!rtc_peerconnection_factory_ && !is_myaudio) {
     rtc_peerconnection_factory_ = CreatePeerConnectionFactory(
         network_thread_.get(), worker_thread_.get(), signaling_thread_.get(),
         audio_device_module_, webrtc::CreateBuiltinAudioEncoderFactory(),
@@ -99,6 +115,19 @@ bool RTCPeerConnectionFactoryImpl::Initialize() {
         nullptr, audio_processing_impl_->GetAudioProcessing(), nullptr, nullptr,
         audio_transport_factory_);
   }
+  if (!rtc_peerconnection_factory_ && is_myaudio) {
+    empty_pc_factory_ = CreatePeerConnectionFactory(
+        network_thread_.get(), worker_thread_.get(), signaling_thread_.get(),
+        empty_audio_device_module_, webrtc::CreateBuiltinAudioEncoderFactory(),
+        webrtc::CreateBuiltinAudioDecoderFactory(),
+#if defined(USE_INTEL_MEDIA_SDK)
+        CreateIntelVideoEncoderFactory(), CreateIntelVideoDecoderFactory(),
+#else
+        webrtc::CreateBuiltinVideoEncoderFactory(),
+        webrtc::CreateBuiltinVideoDecoderFactory(),
+#endif
+        nullptr, nullptr, nullptr, nullptr, nullptr);
+  }
 
   if (!rtc_peerconnection_factory_.get()) {
     Terminate();
@@ -115,7 +144,8 @@ bool RTCPeerConnectionFactoryImpl::Terminate() {
     audio_processing_impl_ = nullptr;
   });
   rtc_peerconnection_factory_ = NULL;
-  if (audio_device_module_) {
+  empty_pc_factory_ = NULL;
+  if (audio_device_module_ || empty_audio_device_module_) {
     worker_thread_->BlockingCall([this] { DestroyAudioDeviceModule_w(); });
   }
 
@@ -124,17 +154,21 @@ bool RTCPeerConnectionFactoryImpl::Terminate() {
 
 void RTCPeerConnectionFactoryImpl::CreateAudioDeviceModule_w() {
   if (!audio_device_module_) {
-    audio_device_module_ = webrtc::CreateAudioDeviceModule(
+    if (!is_myaudio) {
+      audio_device_module_ = webrtc::CreateAudioDeviceModule(
         env_,
         webrtc::AudioDeviceModule::kPlatformDefaultAudio,
         false);
-    // Initialize the ADM eagerly so device enumeration (RecordingDevices/
-    // PlayoutDevices) works before a PeerConnection has been created. On
-    // desktop these queries return early unless the module is initialized,
-    // and the voice engine otherwise defers Init() until the audio pipeline
-    // is set up. Init() is idempotent, so the later engine call is a no-op.
-    if (audio_device_module_)
-      audio_device_module_->Init();
+        // Initialize the ADM eagerly so device enumeration (RecordingDevices/
+        // PlayoutDevices) works before a PeerConnection has been created. On
+        // desktop these queries return early unless the module is initialized,
+        // and the voice engine otherwise defers Init() until the audio pipeline
+        // is set up. Init() is idempotent, so the later engine call is a no-op.
+        if (audio_device_module_)
+          audio_device_module_->Init();
+    } else {
+      audio_device_module_ = webrtc::make_ref_counted<EmptyAudioDeviceModule>();
+    }
   }
 }
 

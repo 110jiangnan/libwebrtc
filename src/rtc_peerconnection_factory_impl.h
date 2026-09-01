@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "api/environment/environment_factory.h"
+#include "api/audio/empty_audio_device_module.h"
 #include "api/media_stream_interface.h"
 #include "api/peer_connection_interface.h"
 #include "api/task_queue/task_queue_factory.h"
@@ -30,6 +31,8 @@ class RTCPeerConnectionFactoryImpl : public RTCPeerConnectionFactory {
   RTCPeerConnectionFactoryImpl();
 
   virtual ~RTCPeerConnectionFactoryImpl();
+
+  RTCPeerConnectionFactoryImpl copySharedField()
 
   bool Initialize() override;
 
@@ -106,9 +109,9 @@ class RTCPeerConnectionFactoryImpl : public RTCPeerConnectionFactory {
       scoped_refptr<RTCMediaConstraints> constraints);
 #endif
  private:
-  std::unique_ptr<webrtc::Thread> worker_thread_;
-  std::unique_ptr<webrtc::Thread> signaling_thread_;
-  std::unique_ptr<webrtc::Thread> network_thread_;
+  std::shared_ptr<webrtc::Thread> worker_thread_;
+  std::shared_ptr<webrtc::Thread> signaling_thread_;
+  std::shared_ptr<webrtc::Thread> network_thread_;
   webrtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface>
       rtc_peerconnection_factory_;
   webrtc::scoped_refptr<webrtc::AudioDeviceModule> audio_device_module_;
@@ -123,6 +126,9 @@ class RTCPeerConnectionFactoryImpl : public RTCPeerConnectionFactory {
   webrtc::scoped_refptr<webrtc::CustomAudioTransportFactory>
       audio_transport_factory_;
   webrtc::Environment env_;
+
+  public:
+    bool is_myaudio = false;
 };
 
 }  // namespace libwebrtc

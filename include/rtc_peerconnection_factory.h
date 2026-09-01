@@ -22,6 +22,9 @@ class RTCRtpCapabilities;
 
 class RTCPeerConnectionFactory : public RefCountInterface {
  public:
+
+  virtual RTCPeerConnectionFactory copySharedField() = 0;
+  
   virtual bool Initialize() = 0;
 
   virtual bool Terminate() = 0;
