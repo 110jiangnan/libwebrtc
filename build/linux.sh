@@ -18,6 +18,10 @@ fi
 # ARM64	64 位	iPhone、Android 旗舰、Mac M 系列、树莓派 4/5、云服务器	✅ 移动/新兴计算主流
 # export ARCH=x64 # x86, x64, arm, arm64
 
+# 预先
+# python3 build/linux/sysroot_scripts/install-sysroot.py --arch=arm
+# python3 build/linux/sysroot_scripts/install-sysroot.py --arch=arm64
+
 gn gen $OUT_DIR/Linux-x64 --args="
     target_os=\"linux\"
     target_cpu=\"x64\"
@@ -82,10 +86,15 @@ gn gen $OUT_DIR/Linux-arm64 --args="
 
 ninja -C $OUT_DIR/Linux-arm64 libwebrtc
 
+mkdir -p $OUT_DIR/linux-lib/linux-arm64
+mkdir -p $OUT_DIR/linux-lib/linux-arm
+mkdir -p $OUT_DIR/linux-lib/linux-x86
+mkdir -p $OUT_DIR/linux-lib/linux-x64
+
 cp $OUT_DIR/Linux-arm64/libwebrtc.so $OUT_DIR/linux-lib/linux-arm64/
 cp $OUT_DIR/Linux-arm/libwebrtc.so $OUT_DIR/linux-lib/linux-arm/
 cp $OUT_DIR/Linux-x86/libwebrtc.so $OUT_DIR/linux-lib/linux-x86/
 cp $OUT_DIR/Linux-x64/libwebrtc.so $OUT_DIR/linux-lib/linux-x64/
 
-
+cp -r ./libwebrtc/include $OUT_DIR/linux-lib/include
 
